@@ -1,79 +1,114 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/contexts/AuthContext";
-import BottomNav from "@/components/BottomNav";
-import SideNav from "@/components/SideNav";
-import HomePage from "@/pages/Home";
-import AuthPage from "@/pages/Auth";
-import ProductDetailPage from "@/pages/ProductDetail";
-import PostPage from "@/pages/Post";
-import ChatsPage from "@/pages/Chats";
-import ChatDetailPage from "@/pages/ChatDetail";
-import ProfilePage from "@/pages/Profile";
-import ProfileViewPage from "@/pages/ProfileView";
-import PublicProfilePage from "@/pages/PublicProfile";
-import SellerShopPage from "@/pages/SellerShop";
-import SearchPage from "@/pages/Search";
-import NotificationsPage from "@/pages/Notifications";
-import EditProfilePage from "@/pages/EditProfile";
-import FollowersPage from "@/pages/Followers";
-import FollowingPage from "@/pages/Following";
-import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
+
+import BottomNav from "@/components/BottomNav";
+import SideNav from "@/components/SideNav";
+
+import Home from "@/pages/Home";
+import Auth from "@/pages/Auth";
+import Profile from "@/pages/Profile";
+import ProfileView from "@/pages/ProfileView";
+import EditProfile from "@/pages/EditProfile";
+import PublicProfile from "@/pages/PublicProfile";
+import Followers from "@/pages/Followers";
+import Following from "@/pages/Following";
+import Notifications from "@/pages/Notifications";
+import ChatDetail from "@/pages/ChatDetail";
+import Chats from "@/pages/Chats";
+import ProductDetail from "@/pages/ProductDetail";
+import Search from "@/pages/Search";
+import Post from "@/pages/Post";
+import SellerShop from "@/pages/SellerShop";
+import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-function AppLayout() {
+function AppShell({ user }: { user: User | null }) {
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-full max-w-[430px] mx-auto">
+          <Auth />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Desktop sidebar - hidden on mobile */}
-      <div className="hidden md:flex md:flex-col md:w-64 md:shrink-0 border-r border-border">
-        <SideNav />
-      </div>
+      {/* Desktop sidebar */}
+      <SideNav user={user} />
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 relative">
-        <div className="max-w-[430px] md:max-w-none mx-auto relative shadow-2xl md:shadow-none border-x border-border/50 md:border-x-0 min-h-screen">
+      <div className="flex-1 flex flex-col md:ml-64 lg:ml-72">
+        <div className="flex-1 pb-20 md:pb-0">
           <Switch>
-            <Route path="/" component={HomePage} />
-            <Route path="/auth" component={AuthPage} />
-            <Route path="/product/:id" component={ProductDetailPage} />
-            <Route path="/post" component={PostPage} />
-            <Route path="/chat" component={ChatsPage} />
-            <Route path="/chat/:id" component={ChatDetailPage} />
-            <Route path="/profile/view" component={ProfileViewPage} />
-            <Route path="/profile/edit" component={EditProfilePage} />
-            <Route path="/profile/:id" component={PublicProfilePage} />
-            <Route path="/profile" component={ProfilePage} />
-            <Route path="/seller/:id/shop" component={SellerShopPage} />
-            <Route path="/search" component={SearchPage} />
-            <Route path="/notifications" component={NotificationsPage} />
-            <Route path="/followers/:id" component={FollowersPage} />
-            <Route path="/following/:id" component={FollowingPage} />
+            <Route path="/" component={Home} />
+            <Route path="/search" component={Search} />
+            <Route path="/post" component={Post} />
+            <Route path="/chats" component={Chats} />
+            <Route path="/chats/:id" component={ChatDetail} />
+            <Route path="/notifications" component={Notifications} />
+            <Route path="/profile/view" component={ProfileView} />
+            <Route path="/profile/edit" component={EditProfile} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/profile/:id" component={PublicProfile} />
+            <Route path="/followers/:id" component={Followers} />
+            <Route path="/following/:id" component={Following} />
+            <Route path="/product/:id" component={ProductDetail} />
+            <Route path="/shop/:id" component={SellerShop} />
             <Route component={NotFound} />
           </Switch>
-          {/* Mobile bottom nav */}
-          <div className="md:hidden">
-            <BottomNav />
-          </div>
         </div>
+
+        {/* Mobile bottom nav */}
+        <BottomNav user={user} />
       </div>
     </div>
   );
 }
 
 function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <AppLayout />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AppShell user={user} />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
